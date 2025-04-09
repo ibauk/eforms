@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/mail"
 	"net/smtp"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -46,14 +47,54 @@ type EVENTCFG struct {
 	MaxPatches    int      `json:"MaxPatches"`
 }
 
+type EVENTMAP map[string]EVENTCFG
+
 const BBR = `{
-	"RallyKey": "BBR25",
-	"RallyDesc":"2025 Brit Butt Rally",
-	"MaxTeeshirts": 2,
-	"TeeshirtSizes":["S","M","L","XL","XXL"],
-	"MaxPatches": 2
+  "bbr25": {
+    "RallyKey": "bbr25",
+    "RallyDesc": "2025 Brit Butt Rally",
+    "MaxTeeshirts": 2,
+    "TeeshirtSizes": [
+      "S",
+      "M",
+      "L",
+      "XL",
+      "XXL"
+    ],
+    "MaxPatches": 2
+  },
+  "rblr25": {
+    "RallyKey": "rblr25",
+    "RallyDesc": "2025 RBLR1000",
+    "MaxTeeshirts": 2,
+    "TeeshirtSizes": [
+      "S",
+      "M",
+      "L",
+      "XL",
+      "XXL"
+    ],
+    "MaxPatches": 2
+  }
 }`
 
+func checkerr(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func fetchEvent(key string) EVENTCFG {
+	var cfg EVENTMAP
+	err := json.Unmarshal([]byte(BBR), &cfg)
+	checkerr(err)
+	for k, v := range cfg {
+		if k == key {
+			return v
+		}
+	}
+	return EVENTCFG{}
+}
 func intval(x string) int {
 
 	re := regexp.MustCompile(`(\d+)`)
@@ -88,6 +129,10 @@ func json_requests(w http.ResponseWriter, r *http.Request) {
 	}
 	email := r.FormValue("email")
 	token := r.FormValue("token")
+	rally := r.FormValue("rally")
+	if rally == "" {
+		rally = "bbr25"
+	}
 
 	if email == "" {
 		json_response(w, false, "no email supplied")
@@ -101,8 +146,13 @@ func json_requests(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		json_response(w, true, token)
-		msg := `<p>Your token is <strong><em>` + token + `</em></strong></p>`
-		sendmail(email, "Hello sailor", msg)
+
+		fmt.Println(r.Proto + " ... " + r.Host + " === " + r.URL.Host)
+
+		cfg := fetchEvent(rally)
+		msg := fmt.Sprintf(`<h1>%s</h1><p>Please verify your email by entering the code <strong><em>%s</em></strong>`, cfg.RallyDesc, token)
+		msg += fmt.Sprintf(` or by <a href="http://%s/s?email=%s&token=%s">clicking here</a>.</p>`, r.Host, url.QueryEscape(email), url.QueryEscape(token))
+		sendmail(email, "Your code is "+token, msg)
 		return
 	}
 	ok := OTPValid(MyDB, email, token)
@@ -213,24 +263,57 @@ func sendmail(email string, subj string, msg string) { // msg is used for subjec
 
 func start_signup(w http.ResponseWriter, r *http.Request) {
 
-	var cfg EVENTCFG
-	err := json.Unmarshal([]byte(BBR), &cfg)
-	if err != nil {
-		panic(err)
+	email := r.FormValue("email")
+	rally := r.FormValue("rally")
+	token := r.FormValue("token")
+
+	if token != "" {
+		verify_signup(w, r)
+		return
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprint(w, htmlheader)
 	fmt.Fprint(w, `<div>`)
+	fmt.Fprint(w, `<p>`)
 	fmt.Fprint(w, `<fieldset><label for="email">Please enter your email address</label> `)
-	fmt.Fprint(w, `<input type="email" id="email" name="email" style="width:20em;"> `)
+	fmt.Fprintf(w, `<input type="hidden" name="rally" value="%v">`, rally)
+	fmt.Fprintf(w, `<input type="email" id="email" name="email" value="%v"> `, email)
 	fmt.Fprint(w, `<input type="button" value="verify" onclick="trigger_email_validation(this)">`)
 	fmt.Fprint(w, ` </fieldset>`)
+
 	fmt.Fprint(w, `</div>`)
-	fmt.Fprintf(w, `<div>%v</div>`, cfg)
 	fmt.Fprint(w, `</body></html>`)
 
 }
+func verify_signup(w http.ResponseWriter, r *http.Request) {
+
+	email := r.FormValue("email")
+	rally := r.FormValue("rally")
+	token := r.FormValue("token")
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprint(w, htmlheader)
+	fmt.Fprint(w, `<div>`)
+	fmt.Fprint(w, `<p>`)
+	fmt.Fprint(w, `<fieldset><label for="email">email address</label> `)
+	fmt.Fprintf(w, `<input type="hidden" name="rally" value="%v">`, rally)
+	fmt.Fprintf(w, `<input type="hidden" id="token" name="token" value="%v">`, token)
+	fmt.Fprintf(w, `<input type="email" id="email" name="email" readonly value="%v"> `, email)
+	//fmt.Fprint(w, `<input type="button" value="verify" onclick="trigger_email_validation(this)">`)
+	fmt.Fprint(w, ` </fieldset>`)
+
+	fmt.Fprint(w, `<fieldset id="tokenzone">`)
+	fmt.Fprintf(w, `<input type="hidden" id="tokenlen" value="%v">`, defaultTokenSize)
+	for i := 1; i <= defaultTokenSize; i++ {
+		fmt.Fprintf(w, `<input type="text" id="vtchar%v" class="verify-token" oninput="tokenInput(this)"> `, i)
+	}
+	fmt.Fprint(w, `</fieldset>`)
+	fmt.Fprint(w, `</div>`)
+	fmt.Fprint(w, `</body></html>`)
+
+}
+
 func main() {
 	var err error
 	flag.Parse()

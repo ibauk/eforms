@@ -19,6 +19,7 @@ func OTPGenerate(db *gorm.DB, userEmail string, otpLength int) (token string, er
 	x := OTPgenerateOTP(otpLength)
 	token = x
 
+	db.Where("user_email LIKE ?", userEmail).Delete(&OtpModel{})
 	err = db.Create(&OtpModel{
 		UserEmail: userEmail,
 		Token:     token,
