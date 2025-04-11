@@ -151,7 +151,7 @@ func json_requests(w http.ResponseWriter, r *http.Request) {
 
 		cfg := fetchEvent(rally)
 		msg := fmt.Sprintf(`<h1>%s</h1><p>Please verify your email by entering the code <strong><em>%s</em></strong>`, cfg.RallyDesc, token)
-		msg += fmt.Sprintf(` or by <a href="http://%s/s?email=%s&token=%s">clicking here</a>.</p>`, r.Host, url.QueryEscape(email), url.QueryEscape(token))
+		msg += fmt.Sprintf(` or by <a href="http://%s/s?email=%s&token=%s&rally=%s">clicking here</a>.</p>`, r.Host, url.QueryEscape(email), url.QueryEscape(token), url.QueryEscape(rally))
 		sendmail(email, "Your code is "+token, msg)
 		return
 	}
@@ -261,6 +261,36 @@ func sendmail(email string, subj string, msg string) { // msg is used for subjec
 
 }
 
+func send_token_form(w http.ResponseWriter, r *http.Request, hide bool) {
+
+	tl := intval(r.FormValue("tokenlen"))
+	if tl < 1 {
+		tl = defaultTokenSize
+	}
+
+	tkn := r.FormValue("token")
+	fmt.Fprint(w, `<fieldset class="tokenzone`)
+	if hide {
+		fmt.Fprint(w, ` hide`)
+	}
+	fmt.Fprint(w, `">`)
+	fmt.Fprintf(w, `<input type="hidden" id="tokenlen" value="%v">`, tl)
+	fmt.Fprint(w, `<label for="vtchar1">Please enter the code</label> `)
+
+	fmt.Fprint(w, `<span class="field">`)
+	for i := 1; i <= tl; i++ {
+		c := ""
+		if len(tkn) >= i {
+			c = tkn[i-1 : i]
+		}
+		fmt.Fprintf(w, `<input type="text" id="vtchar%v" class="verify-token" oninput="tokenInput(this)" value="%v"> `, i, c)
+	}
+	fmt.Fprint(w, `</span>`)
+	fmt.Fprint(w, `<input type="button" id="checktoken" value="Verify" onclick="verify_email_validation(this)"> `)
+	fmt.Fprint(w, `<span id="checkresult"> </span>`)
+	fmt.Fprint(w, `</fieldset>`)
+
+}
 func start_signup(w http.ResponseWriter, r *http.Request) {
 
 	email := r.FormValue("email")
@@ -268,25 +298,28 @@ func start_signup(w http.ResponseWriter, r *http.Request) {
 	token := r.FormValue("token")
 
 	if token != "" {
-		verify_signup(w, r)
+		verify_email(w, r)
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprint(w, htmlheader)
-	fmt.Fprint(w, `<div>`)
-	fmt.Fprint(w, `<p>`)
+	fmt.Fprint(w, `<article class="signupform">`)
+	cfg := fetchEvent(rally)
+	fmt.Fprintf(w, `<h1>%v</h1>`, cfg.RallyDesc)
 	fmt.Fprint(w, `<fieldset><label for="email">Please enter your email address</label> `)
-	fmt.Fprintf(w, `<input type="hidden" name="rally" value="%v">`, rally)
+	fmt.Fprintf(w, `<input type="hidden" id="rally" name="rally" value="%v" onchange="retry_email(this)">`, rally)
 	fmt.Fprintf(w, `<input type="email" id="email" name="email" value="%v"> `, email)
-	fmt.Fprint(w, `<input type="button" value="verify" onclick="trigger_email_validation(this)">`)
+	fmt.Fprint(w, `<input type="button" id="tevbtn" value="verify" onclick="trigger_email_validation(this)">`)
 	fmt.Fprint(w, ` </fieldset>`)
 
-	fmt.Fprint(w, `</div>`)
+	send_token_form(w, r, true)
+
+	fmt.Fprint(w, `</article>`)
 	fmt.Fprint(w, `</body></html>`)
 
 }
-func verify_signup(w http.ResponseWriter, r *http.Request) {
+func verify_email(w http.ResponseWriter, r *http.Request) {
 
 	email := r.FormValue("email")
 	rally := r.FormValue("rally")
@@ -294,22 +327,19 @@ func verify_signup(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprint(w, htmlheader)
-	fmt.Fprint(w, `<div>`)
-	fmt.Fprint(w, `<p>`)
+	fmt.Fprint(w, `<article class="signupform">`)
+	cfg := fetchEvent(rally)
+	fmt.Fprintf(w, `<h1>%v</h1>`, cfg.RallyDesc)
 	fmt.Fprint(w, `<fieldset><label for="email">email address</label> `)
-	fmt.Fprintf(w, `<input type="hidden" name="rally" value="%v">`, rally)
+	fmt.Fprintf(w, `<input type="hidden" id="rally" name="rally" value="%v">`, rally)
 	fmt.Fprintf(w, `<input type="hidden" id="token" name="token" value="%v">`, token)
-	fmt.Fprintf(w, `<input type="email" id="email" name="email" readonly value="%v"> `, email)
-	//fmt.Fprint(w, `<input type="button" value="verify" onclick="trigger_email_validation(this)">`)
+	fmt.Fprintf(w, `<input type="email" id="email" name="email" value="%v" onchange="retry_email(this)"> `, email)
+	fmt.Fprint(w, `<input type="button" disabled id="tevbtn" value="verify" onclick="trigger_email_validation(this)">`)
 	fmt.Fprint(w, ` </fieldset>`)
 
-	fmt.Fprint(w, `<fieldset id="tokenzone">`)
-	fmt.Fprintf(w, `<input type="hidden" id="tokenlen" value="%v">`, defaultTokenSize)
-	for i := 1; i <= defaultTokenSize; i++ {
-		fmt.Fprintf(w, `<input type="text" id="vtchar%v" class="verify-token" oninput="tokenInput(this)"> `, i)
-	}
-	fmt.Fprint(w, `</fieldset>`)
-	fmt.Fprint(w, `</div>`)
+	send_token_form(w, r, false)
+
+	fmt.Fprint(w, `</article>`)
 	fmt.Fprint(w, `</body></html>`)
 
 }

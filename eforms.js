@@ -1,27 +1,53 @@
 "use strict";
 
+const validbtn = "checktoken";
+const vtc = "vtchar";
+const vtl = vtc.length;
+
+function retry_email(obj) {
+  let tevbtn = document.getElementById("tevbtn");
+  if (tevbtn) tevbtn.disabled = false;
+  const tz = document.getElementsByClassName("tokenzone");
+  for (let i = 0; i < tz.length; i++) tz[i].classList.add("hide");
+}
 function tokenInput(inp) {
-  const vtc = "vtchar";
-  const vtl = vtc.length;
   let vtmax = document.getElementById("tokenlen").value;
 
-  let id = inp.getAttribute("id").substr(vtl);
-  console.log("Checking " + id);
-  if (inp.value.length > 1) {
-    let c = inp.value.substr(1);
-    inp.value = inp.value.substr(0, 1);
-    id++;
+  let c = "";
+  let id = inp.getAttribute("id").substring(vtl);
+  for (; id <= vtmax; id++) {
+    let x = document.getElementById(vtc + id);
+    if (!x) break;
+    x.value += c;
+    c = "";
+    if (x.value.length > 1) {
+      c = x.value.substring(1);
+      x.value = x.value.substring(0, 1);
+    } else break;
   }
-  id++;
-  if (id <= vtmax) {
-    console.log("Focusing on " + vtc + id);
-    document.getElementById(vtc + id).focus();
+  if (id < vtmax) {
+    let x = document.getElementById(vtc + (id + 1));
+    if (x) x.focus();
+  } else {
+    let x = document.getElementById(validbtn);
+    if (x) x.click();
   }
 }
+
 function trigger_email_validation(obj) {
   let email = document.querySelector("#email").value;
   if (email == "") return;
+  let rally = document.querySelector("#rally").value;
+  if (rally == "") return;
+
+  obj.disabled = true;
+
   let url = "/x?email=" + encodeURIComponent(email);
+  url += "&rally=" + encodeURIComponent(rally);
+  let token = document.querySelector("#token");
+  if (token && token.value != "")
+    url += "&token=" + encodeURIComponent(token.value);
+  let res = document.getElementById("checkresult")
   fetch(url)
     .then((response) => {
       if (!response.ok) {
@@ -34,9 +60,26 @@ function trigger_email_validation(obj) {
         console.error(`Error! ${data.msg}`);
       } else {
         console.log(data);
+        const tz = document.getElementsByClassName("tokenzone");
+        for (let i = 0; i < tz.length; i++) tz[i].classList.remove("hide");
+        let x = document.getElementById(vtc + "1");
+        if (x) x.focus();
       }
     })
     .catch((error) => {
       console.error("Fetch error:", error);
     });
+}
+
+function verify_email_validation(obj) {
+  let tkn = document.getElementById("token");
+  if (!tkn) return;
+  tkn.value = "";
+  for (let id = 1; ; id++) {
+    let x = document.getElementById(vtc + id);
+    if (!x) break;
+    tkn.value += x.value;
+  }
+
+  trigger_email_validation(obj);
 }

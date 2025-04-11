@@ -9,8 +9,6 @@
 .field {
   margin: 1em;
   border: none;
-  display: grid;
-  grid-template-columns: 15em 15em 1fr;
 }
 .field label {
   text-align: right;
@@ -56,20 +54,45 @@ fieldset.inline {
 }
 
 input[type="email"] {
-
-    width: 20em;
+  width: 20em;
+  margin-right: 3px;
+  padding: 3px;
 }
 input[type="button"] {
+  padding: 0 3px 0 3px;
+  border-radius: 5px;
+}
+h1 {
+  text-align: center;
+  padding: 1em;
+}
+label {
+  text-align: right;
+  padding: 3px;
+  margin-right: 3px;
+}
 
-    padding: 0 3px 0 3px;
-    border-radius: 5px;
+.signupform {
+  max-width: 60em;
+  padding: 1em;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+}
+.signupform fieldset {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  margin: 1em;
+  border: none;
 }
 .verify-token {
-
-    width: 1em;
-    text-align: center;
-    padding: 0 3px 0 3px;
-    margin: 3px;
+  width: 1.2em;
+  text-align: center;
+  padding: 0 3px 0 3px;
+  margin: 3px;
 }
 
 img.flagicon {
@@ -118,9 +141,6 @@ button.plus {
   cursor: pointer;
 }
 
-.hide {
-  display: none;
-}
 
 article.about {
   display: block;
@@ -246,7 +266,7 @@ header {
 }
 
 .hide {
-  display: none;
+  display: none !important;
 }
 
 @media print {
