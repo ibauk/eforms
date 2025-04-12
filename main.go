@@ -145,7 +145,7 @@ func json_requests(w http.ResponseWriter, r *http.Request) {
 			json_response(w, false, "error generating token")
 			return
 		}
-		json_response(w, true, token)
+		json_response(w, true, "")
 
 		fmt.Println(r.Proto + " ... " + r.Host + " === " + r.URL.Host)
 
@@ -287,8 +287,11 @@ func send_token_form(w http.ResponseWriter, r *http.Request, hide bool) {
 	}
 	fmt.Fprint(w, `</span>`)
 	fmt.Fprint(w, `<input type="button" id="checktoken" value="Verify" onclick="verify_email_validation(this)"> `)
-	fmt.Fprint(w, `<span id="checkresult"> </span>`)
+	fmt.Fprint(w, ` &nbsp;&nbsp; <span id="checkresult"> </span>`)
 	fmt.Fprint(w, `</fieldset>`)
+	if !hide && tkn != "" {
+		fmt.Fprint(w, `<script>verify_email_validation(document.getElementById('checktoken'))</script>`)
+	}
 
 }
 func start_signup(w http.ResponseWriter, r *http.Request) {
@@ -297,11 +300,6 @@ func start_signup(w http.ResponseWriter, r *http.Request) {
 	rally := r.FormValue("rally")
 	token := r.FormValue("token")
 
-	if token != "" {
-		verify_email(w, r)
-		return
-	}
-
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprint(w, htmlheader)
 	fmt.Fprint(w, `<article class="signupform">`)
@@ -309,35 +307,14 @@ func start_signup(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, `<h1>%v</h1>`, cfg.RallyDesc)
 	fmt.Fprint(w, `<fieldset><label for="email">Please enter your email address</label> `)
 	fmt.Fprintf(w, `<input type="hidden" id="rally" name="rally" value="%v" onchange="retry_email(this)">`, rally)
-	fmt.Fprintf(w, `<input type="email" id="email" name="email" value="%v"> `, email)
-	fmt.Fprint(w, `<input type="button" id="tevbtn" value="verify" onclick="trigger_email_validation(this)">`)
-	fmt.Fprint(w, ` </fieldset>`)
-
-	send_token_form(w, r, true)
-
-	fmt.Fprint(w, `</article>`)
-	fmt.Fprint(w, `</body></html>`)
-
-}
-func verify_email(w http.ResponseWriter, r *http.Request) {
-
-	email := r.FormValue("email")
-	rally := r.FormValue("rally")
-	token := r.FormValue("token")
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprint(w, htmlheader)
-	fmt.Fprint(w, `<article class="signupform">`)
-	cfg := fetchEvent(rally)
-	fmt.Fprintf(w, `<h1>%v</h1>`, cfg.RallyDesc)
-	fmt.Fprint(w, `<fieldset><label for="email">email address</label> `)
-	fmt.Fprintf(w, `<input type="hidden" id="rally" name="rally" value="%v">`, rally)
 	fmt.Fprintf(w, `<input type="hidden" id="token" name="token" value="%v">`, token)
 	fmt.Fprintf(w, `<input type="email" id="email" name="email" value="%v" onchange="retry_email(this)"> `, email)
-	fmt.Fprint(w, `<input type="button" disabled id="tevbtn" value="verify" onclick="trigger_email_validation(this)">`)
+	fmt.Fprint(w, `<input type="button" id="tevbtn" disabled value="verify" onclick="trigger_email_validation(this)">`)
 	fmt.Fprint(w, ` </fieldset>`)
 
-	send_token_form(w, r, false)
+	fmt.Fprint(w, `<fieldset class="tokenzone hide">Please check your email for a one time code then enter the code below</fieldset>`)
+
+	send_token_form(w, r, token == "")
 
 	fmt.Fprint(w, `</article>`)
 	fmt.Fprint(w, `</body></html>`)
