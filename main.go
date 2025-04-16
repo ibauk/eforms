@@ -4,9 +4,11 @@ import (
 	// "log"
 
 	"crypto/tls"
+	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"html/template"
 	"log"
 	"net"
 	"net/http"
@@ -22,12 +24,14 @@ import (
 	"gorm.io/gorm"
 )
 
-var dbpath = flag.String("db", "./otps.db", "Database to use")
+var dbpath = flag.String("db", "./eforms.db", "Forms database to use")
+var otcpath = flag.String("otc", "./otps.db", "OTC Database to use")
 var port = flag.String("port", "1014", "Port to service requests")
 
 const defaultTokenSize = 4
 
-var MyDB *gorm.DB
+var MyOTC *gorm.DB
+var MyDB *sql.DB
 
 type EMAILCFG struct {
 	SenderName     string
@@ -110,7 +114,7 @@ func intval(x string) int {
 
 }
 
-func json_response(w http.ResponseWriter, ok bool, msg string) {
+func json_response(w http.ResponseWriter, ok bool, msg string, entrant int) {
 
 	fmt.Fprint(w, `{"ok":`)
 	if ok {
@@ -118,7 +122,7 @@ func json_response(w http.ResponseWriter, ok bool, msg string) {
 	} else {
 		fmt.Fprint(w, `false`)
 	}
-	fmt.Fprintf(w, `,"msg":"%v"}`, msg)
+	fmt.Fprintf(w, `,"msg":"%v","entrant":%v}`, msg, entrant)
 }
 
 func json_requests(w http.ResponseWriter, r *http.Request) {
@@ -127,6 +131,7 @@ func json_requests(w http.ResponseWriter, r *http.Request) {
 	if len < 1 {
 		len = defaultTokenSize
 	}
+	entrant := intval(r.FormValue("entrant"))
 	email := r.FormValue("email")
 	token := r.FormValue("token")
 	rally := r.FormValue("rally")
@@ -135,17 +140,17 @@ func json_requests(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if email == "" {
-		json_response(w, false, "no email supplied")
+		json_response(w, false, "no email supplied", 0)
 		return
 	}
 
 	if token == "" {
-		token, err := OTPGenerate(MyDB, email, len) //Parameters: database, email, otp length
+		token, err := OTPGenerate(MyOTC, email, len) //Parameters: database, email, otp length
 		if err != nil {
-			json_response(w, false, "error generating token")
+			json_response(w, false, "error generating token", 0)
 			return
 		}
-		json_response(w, true, "")
+		json_response(w, true, "", 0)
 
 		fmt.Println(r.Proto + " ... " + r.Host + " === " + r.URL.Host)
 
@@ -155,8 +160,36 @@ func json_requests(w http.ResponseWriter, r *http.Request) {
 		sendmail(email, "Your code is "+token, msg)
 		return
 	}
-	ok := OTPValid(MyDB, email, token)
-	json_response(w, ok, token)
+	ok := OTPValid(MyOTC, email, token)
+	if ok {
+		token, entrant = lookup_ridername_from_email(email)
+		if token == "" {
+			token = "ok"
+		}
+	}
+	json_response(w, ok, token, entrant)
+}
+
+func lookup_ridername_from_email(email string) (string, int) {
+
+	res := ""
+	n := 0
+	sqlx := "SELECT RiderFirst,RiderLast,EntrantNumber FROM entrants WHERE RiderEmail=?"
+	stmt, err := MyDB.Prepare(sqlx)
+	checkerr(err)
+	defer stmt.Close()
+	rows, err := stmt.Query(email)
+	checkerr(err)
+	defer rows.Close()
+	if !rows.Next() {
+		return res, n
+	}
+	var f, l string
+	err = rows.Scan(&f, &l, &n)
+	checkerr(err)
+	res = f + " " + l
+	return res, n
+
 }
 
 var htmlheader = `
@@ -294,6 +327,62 @@ func send_token_form(w http.ResponseWriter, r *http.Request, hide bool) {
 	}
 
 }
+
+func show_entry_form(w http.ResponseWriter, r *http.Request) {
+
+	email := r.FormValue("email")
+	rally := r.FormValue("rally")
+	entrantid := intval(r.FormValue("entrant"))
+	if entrantid < 1 {
+		entrantid = start_new_entrant_record(rally, email)
+	}
+
+	er := fetch_entrant(rally, email)
+
+	tp := template.Must(template.New("eftp").Parse(tp_RiderDetails))
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprint(w, htmlheader)
+	fmt.Fprint(w, `<article class="signupform">`)
+	cfg := fetchEvent(rally)
+	fmt.Fprintf(w, `<h1>%v entry form</h1>`, cfg.RallyDesc)
+
+	fmt.Fprintf(w, `<p>%v</p>`, entrantid)
+	err := tp.Execute(w, er)
+	checkerr(err)
+
+	fmt.Fprint(w, `</article>`)
+}
+
+func start_new_entrant_record(rally string, email string) int {
+
+	res := 1
+	sqlx := "SELECT max(EntrantNumber) FROM entrants WHERE EventCode=?"
+
+	stmt, err := MyDB.Prepare(sqlx)
+	checkerr(err)
+	defer stmt.Close()
+	rows, err := stmt.Query(rally)
+	checkerr(err)
+	defer rows.Close()
+	if rows.Next() {
+		var mx int
+		err = rows.Scan(&mx)
+		checkerr(err)
+		res = mx + 1
+	}
+	rows.Close()
+	stmt.Close()
+
+	sqlx = "INSERT INTO entrants (EventCode,RiderEmail,EntrantNumber) VALUES(?,?,?)"
+	stmt, err = MyDB.Prepare(sqlx)
+	checkerr(err)
+	defer stmt.Close()
+	_, err = stmt.Exec(rally, email, res)
+	checkerr(err)
+
+	return res
+
+}
 func start_signup(w http.ResponseWriter, r *http.Request) {
 
 	email := r.FormValue("email")
@@ -304,7 +393,7 @@ func start_signup(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, htmlheader)
 	fmt.Fprint(w, `<article class="signupform">`)
 	cfg := fetchEvent(rally)
-	fmt.Fprintf(w, `<h1>%v</h1>`, cfg.RallyDesc)
+	fmt.Fprintf(w, `<h1>%v entry form</h1>`, cfg.RallyDesc)
 	fmt.Fprint(w, `<fieldset><label for="email">Please enter your email address</label> `)
 	fmt.Fprintf(w, `<input type="hidden" id="rally" name="rally" value="%v" onchange="retry_email(this)">`, rally)
 	fmt.Fprintf(w, `<input type="hidden" id="token" name="token" value="%v">`, token)
@@ -316,7 +405,14 @@ func start_signup(w http.ResponseWriter, r *http.Request) {
 
 	send_token_form(w, r, token == "")
 
+	fmt.Fprint(w, `<div id="confirmID" class="hide">`)
+	fmt.Fprint(w, `<fieldset><label for="x"> - is this you?</label> `)
+	fmt.Fprint(w, `<input type="button" id="x" value="Yes, let's do it" onclick="show_form_start()"> `)
+	fmt.Fprint(w, `<input type="button" value="No, use a different email" onclick="show_signup_start()"> `)
+	fmt.Fprint(w, `</div>`)
+
 	fmt.Fprint(w, `</article>`)
+
 	fmt.Fprint(w, `</body></html>`)
 
 }
@@ -324,16 +420,24 @@ func start_signup(w http.ResponseWriter, r *http.Request) {
 func main() {
 	var err error
 	flag.Parse()
-	MyDB, err = gorm.Open(sqlite.Open(*dbpath), &gorm.Config{}) // Connect any database for Postgresql, Sqlite
+	MyOTC, err = gorm.Open(sqlite.Open(*otcpath), &gorm.Config{}) // Connect any database for Postgresql, Sqlite
 	if err != nil {
-		panic("failed to connect to database")
+		panic("failed to connect to OTC database")
 	}
+
+	MyDB, err = sql.Open("sqlite3", *dbpath)
+	if err != nil {
+		panic("Failed to connect to forms database")
+	}
+
+	debug_fetcher()
 
 	fileserver := http.FileServer(http.Dir("."))
 	http.Handle("/", fileserver)
 
 	http.HandleFunc("/x", json_requests)
 	http.HandleFunc("/s", start_signup)
+	http.HandleFunc("/f", show_entry_form)
 	log.Fatal(http.ListenAndServe(":"+*port, nil))
 
 }

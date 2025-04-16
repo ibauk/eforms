@@ -18,6 +18,39 @@ function clear_token() {
   }
 }
 
+function showConfirmID(ridername,entrant) {
+
+  let cid = document.getElementById("confirmID")
+  if (!cid) return
+  let lbl = document.querySelector("#confirmID label")
+  if (!lbl) return
+  lbl.innerHTML = "<strong>"+ridername + "</strong> - is this you?"
+  cid.setAttribute('data-entrant',entrant)
+  cid.classList.remove("hide")
+  let inp = document.querySelector("#confirmID input")
+  if (inp) inp.focus()
+
+}
+function show_form_start() {
+
+  let cid = document.getElementById("confirmID")
+  if (!cid) return
+  let entrant = cid.getAttribute("data-entrant")
+  if (!entrant) entrant = '0'
+  let email = document.getElementById("email")
+  if (!email) email = "omg@bollox.nuts"
+
+  let url = "/f?email="+encodeURIComponent(email)+"&entrant="+encodeURIComponent(entrant)
+  window.location.href=url
+
+
+}
+
+function show_signup_start() {
+
+  window.location.href="/s"
+
+}
 function retry_email(obj) {
   let tevbtn = document.getElementById("tevbtn");
   if (tevbtn) tevbtn.disabled = false;
@@ -81,7 +114,12 @@ function trigger_email_validation(obj) {
         const tz = document.getElementsByClassName("tokenzone");
         for (let i = 0; i < tz.length; i++) tz[i].classList.remove("hide");
 
-        if (res && data.msg != "") res.innerHTML = checkOK;
+        if (res && data.msg != "") {
+          res.innerHTML = checkOK;
+          if (data.msg != "ok") {
+          showConfirmID(data.msg,data.entrant)
+          }
+        }
         if (data.msg == "") {
           let x = document.getElementById(vtc + "1");
           if (x) x.focus();
