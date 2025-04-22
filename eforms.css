@@ -1,11 +1,26 @@
+:root {
+  --regular-background: rgb(202, 227, 235);
+  --regular-foreground: black;
+  --input-background: rgb(248, 248, 216);
+  --input-foreground: black;
+}
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
   font-family: Verdana, Geneva, Tahoma, sans-serif;
   font-size: 14pt;
+  background: var(--regular-background);
+  color: var(--regular-foreground);
 }
 
+input,
+select {
+  background: var(--input-background);
+  color: var(--input-foreground);
+  font-weight: bold;
+  padding: 3px;
+}
 .field {
   margin: 1em;
   border: none;
@@ -53,15 +68,21 @@ fieldset.inline {
   font-weight: bold;
 }
 
+input[type="text"] {
+  margin-right: 3px;
+}
+
 input[type="email"] {
   width: 20em;
   margin-right: 3px;
-  padding: 3px;
 }
 input[type="button"] {
-  padding: 0 3px 0 3px;
   border-radius: 5px;
-  margin: 0 1em 0 .5em;
+  margin: 0 1em 0 0.5em;
+}
+input:read-only {
+  border: none;
+  background-color: var(--regular-background);
 }
 h1 {
   text-align: center;
@@ -72,7 +93,10 @@ label {
   padding: 3px;
   margin-right: 3px;
 }
-
+.BikeReg {
+  width: 6em;
+  text-transform: uppercase;
+}
 .firstname {
   width: 6em;
 }
@@ -82,6 +106,10 @@ label {
 .postcode {
   text-transform: uppercase;
   width: 6em;
+}
+#RiderRBL,
+#PillionRBL {
+  padding: 3px;
 }
 .signupform {
   max-width: 60em;
@@ -100,11 +128,30 @@ label {
   border: none;
 }
 
+legend {
+  padding: 0 0.5em 0 0.5em;
+  margin: 0 2em 0 1em;
+}
+fieldset.group {
+  border: solid;
+}
+.group:focus-within {
+  border: double red;
+}
+.group fieldset {
+  font-size: inherit;
+}
 fieldset.address {
   display: flex;
   flex-direction: column;
-  align-items: start
-
+  /*align-items: start;*/
+  margin: auto;
+}
+fieldset label1 {
+  width: 50%;
+  text-align: right;
+  margin-right: 5px;
+}
 .verify-token {
   width: 1.2em;
   text-align: center;
@@ -157,7 +204,6 @@ button.plus {
 .link {
   cursor: pointer;
 }
-
 
 article.about {
   display: block;

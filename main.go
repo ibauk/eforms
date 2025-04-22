@@ -170,11 +170,31 @@ func json_requests(w http.ResponseWriter, r *http.Request) {
 	json_response(w, ok, token, entrant)
 }
 
+func json_lookup_iba(w http.ResponseWriter, r *http.Request) {
+
+	f := r.FormValue("f")
+	l := r.FormValue("l")
+	e := r.FormValue("e")
+	if f == "" || l == "" || e == "" {
+		fmt.Fprint(w, `{"ok": false,"msg": "Both names not supplied"}`)
+		return
+	}
+	iba, email := lookupIBAWeb(f, l)
+	fmt.Fprint(w, `{"ok": `)
+	if email == e && iba != "" {
+		fmt.Fprint(w, `true`)
+	} else {
+		fmt.Fprint(w, `false`)
+	}
+
+}
+
+// This is called when a code is used to verify an email address
 func lookup_ridername_from_email(email string) (string, int) {
 
 	res := ""
 	n := 0
-	sqlx := "SELECT RiderFirst,RiderLast,EntrantNumber FROM entrants WHERE RiderEmail=?"
+	sqlx := "SELECT ifnull(First,''),ifnull(Last,''),PersonID FROM persons WHERE Email=?"
 	stmt, err := MyDB.Prepare(sqlx)
 	checkerr(err)
 	defer stmt.Close()
@@ -331,32 +351,49 @@ func send_token_form(w http.ResponseWriter, r *http.Request, hide bool) {
 func show_entry_form(w http.ResponseWriter, r *http.Request) {
 
 	email := r.FormValue("email")
+	if email == "" {
+		start_signup(w, r)
+		return
+	}
 	rally := r.FormValue("rally")
-	entrantid := intval(r.FormValue("entrant"))
-	if entrantid < 1 {
-		entrantid = start_new_entrant_record(rally, email)
+
+	personid := intval(r.FormValue("er"))
+	if personid < 1 {
+		personid = start_new_person_record(email)
 	}
 
-	er := fetch_entrant(rally, email)
+	er := fetch_entrant(rally, personid)
+	if er.EntrantNumber < 1 {
+		start_new_entrant_record(rally, personid)
+	}
 
-	tp := template.Must(template.New("eftp").Parse(tp_RiderDetails))
+	ev := fetch_event_record(rally)
+	er.Event = ev
+	tprd := template.Must(template.New("tprd").Parse(tp_RiderDetails))
+	tppn := template.Must(template.New("tppn").Parse(tp_PillionDetails))
+	tpbk := template.Must(template.New("tpbk").Parse(tp_BikeDetails))
+	tpnk := template.Must(template.New("tpnk").Parse(tp_NokDetails))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprint(w, htmlheader)
 	fmt.Fprint(w, `<article class="signupform">`)
 	cfg := fetchEvent(rally)
 	fmt.Fprintf(w, `<h1>%v entry form</h1>`, cfg.RallyDesc)
 
-	fmt.Fprintf(w, `<p>%v</p>`, entrantid)
-	err := tp.Execute(w, er)
+	err := tprd.Execute(w, er)
 	checkerr(err)
-
+	err = tpbk.Execute(w, er)
+	checkerr(err)
+	err = tpnk.Execute(w, er)
+	checkerr(err)
+	err = tppn.Execute(w, er)
+	checkerr(err)
 	fmt.Fprint(w, `</article>`)
 }
 
-func start_new_entrant_record(rally string, email string) int {
+func start_new_entrant_record(rally string, riderid int) int {
 
 	res := 1
-	sqlx := "SELECT max(EntrantNumber) FROM entrants WHERE EventCode=?"
+	sqlx := "SELECT ifnull(max(EntrantNumber),0) FROM entrants WHERE EventCode=?"
 
 	stmt, err := MyDB.Prepare(sqlx)
 	checkerr(err)
@@ -373,16 +410,36 @@ func start_new_entrant_record(rally string, email string) int {
 	rows.Close()
 	stmt.Close()
 
-	sqlx = "INSERT INTO entrants (EventCode,RiderEmail,EntrantNumber) VALUES(?,?,?)"
+	dt := time.Now()
+	dtx := dt.Format(time.DateOnly)
+
+	sqlx = "INSERT INTO entrants (EventCode,RiderID,EntrantNumber,DateCreated,DateUpdated) VALUES(?,?,?,?,?)"
 	stmt, err = MyDB.Prepare(sqlx)
 	checkerr(err)
 	defer stmt.Close()
-	_, err = stmt.Exec(rally, email, res)
+	_, err = stmt.Exec(rally, riderid, res, dtx, dtx)
 	checkerr(err)
 
 	return res
 
 }
+
+func start_new_person_record(email string) int {
+
+	sqlx := "SELECT ifnull(max(PersonID),0) FROM persons"
+	person := intval(getStringFromDB(sqlx, "0")) + 1
+
+	sqlx = "INSERT INTO persons (PersonID,Email) VALUES(?,?)"
+	stmt, err := MyDB.Prepare(sqlx)
+	checkerr(err)
+	defer stmt.Close()
+	_, err = stmt.Exec(person, email)
+	checkerr(err)
+	return person
+
+}
+
+// This is the start of the whole procedure
 func start_signup(w http.ResponseWriter, r *http.Request) {
 
 	email := r.FormValue("email")
@@ -435,9 +492,10 @@ func main() {
 	fileserver := http.FileServer(http.Dir("."))
 	http.Handle("/", fileserver)
 
-	http.HandleFunc("/x", json_requests)
+	http.HandleFunc("/l", json_lookup_iba)
 	http.HandleFunc("/s", start_signup)
 	http.HandleFunc("/f", show_entry_form)
+	http.HandleFunc("/x", json_requests)
 	log.Fatal(http.ListenAndServe(":"+*port, nil))
 
 }

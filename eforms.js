@@ -18,38 +18,57 @@ function clear_token() {
   }
 }
 
-function showConfirmID(ridername,entrant) {
-
-  let cid = document.getElementById("confirmID")
-  if (!cid) return
-  let lbl = document.querySelector("#confirmID label")
-  if (!lbl) return
-  lbl.innerHTML = "<strong>"+ridername + "</strong> - is this you?"
-  cid.setAttribute('data-entrant',entrant)
-  cid.classList.remove("hide")
-  let inp = document.querySelector("#confirmID input")
-  if (inp) inp.focus()
-
+function flipPillionDetails(obj) {
+  console.log("flipPillionDetails " + obj.value);
+  let pd = document.getElementById("divPillionDetails");
+  if (!pd) return;
+  if (obj.value == "Y") {
+    pd.classList.remove("hide");
+  } else {
+    pd.classList.add("hide");
+  }
 }
+
+function showConfirmID(ridername, entrant) {
+
+  console.log('showConfirmID called with "'+ridername+'" and ['+entrant+']')
+  let cid = document.getElementById("confirmID");
+  if (!cid) return;
+  let lbl = document.querySelector("#confirmID label");
+  if (!lbl) return;
+  let rn = ridername.trim();
+  if (rn == "") {
+    lbl.innerHTML = "You're a new entrant?";
+  } else {
+    lbl.innerHTML = "<strong>" + ridername + "</strong> - is this you?";
+  }
+  cid.setAttribute("data-entrant", entrant);
+  cid.setAttribute("data-ridername", ridername);
+  cid.classList.remove("hide");
+  let inp = document.querySelector("#confirmID input");
+  if (inp) inp.focus();
+}
+
 function show_form_start() {
+  console.log('show_form_start called')
+  let cid = document.getElementById("confirmID");
+  if (!cid) return;
+  let email = document.getElementById("email");
+  if (!email) return;
+  let rally = document.getElementById("rally")
+  let ridername = cid.getAttribute("data-ridername");
+  let entrant = cid.getAttribute("data-entrant");
 
-  let cid = document.getElementById("confirmID")
-  if (!cid) return
-  let entrant = cid.getAttribute("data-entrant")
-  if (!entrant) entrant = '0'
-  let email = document.getElementById("email")
-  if (!email) email = "omg@bollox.nuts"
-
-  let url = "/f?email="+encodeURIComponent(email)+"&entrant="+encodeURIComponent(entrant)
-  window.location.href=url
-
-
+  console.log('sfs calling now')
+  let url = "/f?email=" + encodeURIComponent(email.value);
+  url += "&rally="+encodeURIComponent(rally.value)
+  url += "&rn=" + encodeURIComponent(ridername);
+  url += "&er=" + encodeURIComponent(entrant);
+  window.location.href = url;
 }
 
 function show_signup_start() {
-
-  window.location.href="/s"
-
+  window.location.href = "/s";
 }
 function retry_email(obj) {
   let tevbtn = document.getElementById("tevbtn");
@@ -84,11 +103,13 @@ function tokenInput(inp) {
 function trigger_email_validation(obj) {
   const checkFailed = "&#9746;";
   const checkOK = "&#9745;";
+  console.log('trigger_email_validtion')
   let email = document.querySelector("#email").value;
   if (email == "") return;
   let rally = document.querySelector("#rally").value;
   if (rally == "") return;
 
+  console.log('tev still here')
   if (obj) obj.disabled = true;
 
   let url = "/x?email=" + encodeURIComponent(email);
@@ -117,7 +138,9 @@ function trigger_email_validation(obj) {
         if (res && data.msg != "") {
           res.innerHTML = checkOK;
           if (data.msg != "ok") {
-          showConfirmID(data.msg,data.entrant)
+            showConfirmID(data.msg, data.entrant);
+          } else {
+            showConfirmID("",0)
           }
         }
         if (data.msg == "") {
@@ -132,6 +155,7 @@ function trigger_email_validation(obj) {
 }
 
 function verify_email_validation(obj) {
+  console.log('verify_email_validation called')
   if (obj) obj.disabled = true;
   let tkn = document.getElementById("token");
   if (!tkn) return;
@@ -142,5 +166,6 @@ function verify_email_validation(obj) {
     tkn.value += x.value;
   }
 
+  console.log('vev calling now')
   trigger_email_validation();
 }

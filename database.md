@@ -4,11 +4,11 @@
 
 Field       | Type | Default | Description
 ---         | ---  | ---     | ---
-event_type  | int  | 0       | 0 = Rally
-event_code  | txt  | n/a     | The unique short code for this event. BBR21, Inv21, ...
-event_name  | txt  | n/a     | Full event title - 'Brit Butt Rally 2021'
-rider_fee   | num | 0.00 | Entry fee for rider
-pillion_fee | num | 0.00 | Entry fee for pillion
+EventType   | txt  | rally   | rally, rblr
+EventCode   | txt  | n/a     | The unique short code for this event. BBR21, Inv21, ...
+EventTitle  | txt  | n/a     | Full event title - 'Brit Butt Rally 2021'
+RiderFee    | num | 0.00 | Entry fee for rider
+PillionFee  | num | 0.00 | Entry fee for pillion
 
 ## eve_entrants
 

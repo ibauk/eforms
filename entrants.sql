@@ -5,8 +5,8 @@ CREATE TABLE IF NOT EXISTS "entrants" (
 	"RecordStatus"	INTEGER NOT NULL DEFAULT 0,
 	"DateCreated"	TEXT NOT NULL,
 	"DateUpdated"	TEXT,
-	"RiderFirst"	TEXT NOT NULL,
-	"RiderLast"	TEXT NOT NULL,
+	"RiderFirst"	TEXT,
+	"RiderLast"	TEXT,
 	"RiderIBA"	TEXT,
 	"RiderRBL"	TEXT DEFAULT 'N',
 	"RiderAddr1"	TEXT,
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS "entrants" (
 	"PillionPhone"	TEXT,
 	"PillionEmail"	TEXT,
 	"PillionNoviceYN"	TEXT NOT NULL DEFAULT 'N',
-	"Bike"	TEXT NOT NULL DEFAULT 'motorbike',
+	"Bike"	TEXT,
 	"BikeReg"	TEXT,
 	"OdoCountsMK"	TEXT NOT NULL DEFAULT 'M',
 	"NokName"	TEXT,
@@ -43,21 +43,35 @@ CREATE TABLE IF NOT EXISTS "entrants" (
 	"RouteClass"	TEXT NOT NULL DEFAULT '',
 	"FreeCampingYN"	TEXT NOT NULL DEFAULT 'N',
 	"Sponsorship"	TEXT,
-	"PaymentMethod"	TEXT NOT NULL DEFAULT 'PAYPAL'
+	"PaymentMethod"	TEXT NOT NULL DEFAULT 'PAYPAL',
+	"ScoringEmail"	TEXT,
+	"RiderID"	INTEGER,
+	"PillionID"	INTEGER
 );
 CREATE TABLE IF NOT EXISTS "events" (
 	"EventCode"	TEXT NOT NULL,
-	"EventTitle"	TEXT NOT NULL,
-	"NoviceEvent" TEXT NOT NULL DEFAULT 'rally',
-	"RiderFee"	TEXT NOT NULL,
-	"PillionFee"	TEXT NOT NULL,
-	"TshirtFee"	TEXT NOT NULL,
-	"PatchFee"	TEXT NOT NULL,
-	"MaxTshirts"	INTEGER NOT NULL DEFAULT 2,
-	"MaxPatches"	INTEGER NOT NULL DEFAULT 2,
-	"RouteClasses"	TEXT NOT NULL DEFAULT '',
-	"OfferCampingYN"	TEXT NOT NULL DEFAULT 'N',
-	"PaymentMethods"	TEXT NOT NULL DEFAULT 'PAYPAL',
-	"SponsorshipOptions"	TEXT NOT NULL DEFAULT ''
+	"Config"	TEXT NOT NULL DEFAULT '{}'
+);
+CREATE TABLE IF NOT EXISTS "persons" (
+	"First"	TEXT,
+	"Last"	TEXT,
+	"IBA"	TEXT,
+	"RBL"	TEXT,
+	"Addr1"	TEXT,
+	"Addr2"	TEXT,
+	"Town"	TEXT,
+	"County"	TEXT,
+	"Postcode"	TEXT,
+	"Country"	TEXT,
+	"Phone"	TEXT,
+	"Email"	TEXT NOT NULL,
+	"PersonID"	INTEGER NOT NULL,
+	"AlternativeEmail"	TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "email" ON "persons" (
+	"Email"	ASC
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "personid" ON "persons" (
+	"PersonID"	ASC
 );
 COMMIT;
