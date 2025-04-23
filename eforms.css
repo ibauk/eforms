@@ -3,6 +3,8 @@
   --regular-foreground: black;
   --input-background: rgb(248, 248, 216);
   --input-foreground: black;
+  --changed-background: yellow;
+  --changed-foreground: black;
 }
 * {
   margin: 0;
@@ -20,6 +22,14 @@ select {
   color: var(--input-foreground);
   font-weight: bold;
   padding: 3px;
+}
+input.oi {
+  background-color: var(--changed-background);
+  color: var(--changed-foreground);
+}
+input.oc {
+  background-color: var(--input-background);
+  color: var(--input-foreground);
 }
 .field {
   margin: 1em;

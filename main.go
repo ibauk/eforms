@@ -16,6 +16,7 @@ import (
 	"net/smtp"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -225,6 +226,58 @@ var htmlheader = `
 <body>
 `
 
+func json_save_datafield(w http.ResponseWriter, r *http.Request) {
+
+	const riderprefix = "Rider"
+	const pillionprefix = "Pillion"
+
+	entrant := intval(r.FormValue("e"))
+	rider := intval(r.FormValue("r"))
+	pillion := intval(r.FormValue("p"))
+
+	f := r.FormValue("f")
+	v := r.FormValue("v")
+
+	if entrant < 1 {
+		json_response(w, false, "no entrant supplied", entrant)
+		return
+	}
+	sqlx := ""
+	if f == "" {
+		json_response(w, false, "field is blank", entrant)
+		return
+	}
+	if slices.Contains(RiderFields, f) {
+		ff := f[len(riderprefix):]
+		if rider < 1 {
+			// Make new record
+			json_response(w, false, "new rider not implemented yet", entrant)
+			return
+		} else {
+			sqlx = "UPDATE persons SET " + ff + "=? WHERE PersonID=" + strconv.Itoa(rider)
+		}
+	} else if slices.Contains(PillionFields, f) {
+		ff := f[len(pillionprefix):]
+		if pillion < 1 {
+			// Make new record
+			json_response(w, false, "new pillion not implemented yet", entrant)
+			return
+		} else {
+			sqlx = "UPDATE persons SET " + ff + "=? WHERE PersonID=" + strconv.Itoa(pillion)
+		}
+	} else {
+		sqlx = "UPDATE entrants SET " + f + "=? WHERE EntrantNumber=" + strconv.Itoa(entrant)
+	}
+	fmt.Println(sqlx)
+	stmt, err := MyDB.Prepare(sqlx)
+	checkerr(err)
+	defer stmt.Close()
+	_, err = stmt.Exec(v)
+	checkerr(err)
+	json_response(w, true, "ok", entrant)
+
+}
+
 func sendmail(email string, subj string, msg string) { // msg is used for subject and body so keep it short
 
 	from := mail.Address{Name: emailcfg.SenderName, Address: emailcfg.SenderEmail}
@@ -364,7 +417,7 @@ func show_entry_form(w http.ResponseWriter, r *http.Request) {
 
 	er := fetch_entrant(rally, personid)
 	if er.EntrantNumber < 1 {
-		start_new_entrant_record(rally, personid)
+		er.EntrantNumber = start_new_entrant_record(rally, personid)
 	}
 
 	ev := fetch_event_record(rally)
@@ -379,6 +432,10 @@ func show_entry_form(w http.ResponseWriter, r *http.Request) {
 	cfg := fetchEvent(rally)
 	fmt.Fprintf(w, `<h1>%v entry form</h1>`, cfg.RallyDesc)
 
+	fmt.Fprint(w, `<form method="post" >`)
+	fmt.Fprintf(w, `<input type="hidden" id="EntrantNumber" name="EntrantNumber" value="%v">`, er.EntrantNumber)
+	fmt.Fprintf(w, `<input type="hidden" id="RiderID" name="RiderID" value="%v">`, er.RiderID)
+	fmt.Fprintf(w, `<input type="hidden" id="PillionID" name="PillionID" value="%v">`, er.PillionID)
 	err := tprd.Execute(w, er)
 	checkerr(err)
 	err = tpbk.Execute(w, er)
@@ -387,6 +444,7 @@ func show_entry_form(w http.ResponseWriter, r *http.Request) {
 	checkerr(err)
 	err = tppn.Execute(w, er)
 	checkerr(err)
+	fmt.Fprint(w, `</form>`)
 	fmt.Fprint(w, `</article>`)
 }
 
@@ -496,6 +554,7 @@ func main() {
 	http.HandleFunc("/s", start_signup)
 	http.HandleFunc("/f", show_entry_form)
 	http.HandleFunc("/x", json_requests)
+	http.HandleFunc("/z", json_save_datafield)
 	log.Fatal(http.ListenAndServe(":"+*port, nil))
 
 }

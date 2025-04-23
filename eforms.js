@@ -24,14 +24,29 @@ function flipPillionDetails(obj) {
   if (!pd) return;
   if (obj.value == "Y") {
     pd.classList.remove("hide");
+    console.log('Disabling inputs')
+    let pemail = document.querySelector("#PillionEmail")
+    if (!pemail) return
+    console.log("or enabling them")
+    let ok = (pemail.value !="" && !pemail.classList.contains("oi"))
+    console.log("ok is "+ok)
+    
+    var pdl = Array.prototype.slice.call(pd.querySelectorAll("*"))
+
+    pdl.forEach(elem => {
+      if (elem.tagName=="INPUT" || elem.tagName=="SELECT") {
+        if (elem.name != "PillionEmail") elem.disabled=!ok
+      }
+    });
   } else {
     pd.classList.add("hide");
   }
 }
 
 function showConfirmID(ridername, entrant) {
-
-  console.log('showConfirmID called with "'+ridername+'" and ['+entrant+']')
+  console.log(
+    'showConfirmID called with "' + ridername + '" and [' + entrant + "]"
+  );
   let cid = document.getElementById("confirmID");
   if (!cid) return;
   let lbl = document.querySelector("#confirmID label");
@@ -50,18 +65,18 @@ function showConfirmID(ridername, entrant) {
 }
 
 function show_form_start() {
-  console.log('show_form_start called')
+  console.log("show_form_start called");
   let cid = document.getElementById("confirmID");
   if (!cid) return;
   let email = document.getElementById("email");
   if (!email) return;
-  let rally = document.getElementById("rally")
+  let rally = document.getElementById("rally");
   let ridername = cid.getAttribute("data-ridername");
   let entrant = cid.getAttribute("data-entrant");
 
-  console.log('sfs calling now')
+  console.log("sfs calling now");
   let url = "/f?email=" + encodeURIComponent(email.value);
-  url += "&rally="+encodeURIComponent(rally.value)
+  url += "&rally=" + encodeURIComponent(rally.value);
   url += "&rn=" + encodeURIComponent(ridername);
   url += "&er=" + encodeURIComponent(entrant);
   window.location.href = url;
@@ -103,13 +118,13 @@ function tokenInput(inp) {
 function trigger_email_validation(obj) {
   const checkFailed = "&#9746;";
   const checkOK = "&#9745;";
-  console.log('trigger_email_validtion')
+  console.log("trigger_email_validtion");
   let email = document.querySelector("#email").value;
   if (email == "") return;
   let rally = document.querySelector("#rally").value;
   if (rally == "") return;
 
-  console.log('tev still here')
+  console.log("tev still here");
   if (obj) obj.disabled = true;
 
   let url = "/x?email=" + encodeURIComponent(email);
@@ -140,7 +155,7 @@ function trigger_email_validation(obj) {
           if (data.msg != "ok") {
             showConfirmID(data.msg, data.entrant);
           } else {
-            showConfirmID("",0)
+            showConfirmID("", 0);
           }
         }
         if (data.msg == "") {
@@ -155,7 +170,7 @@ function trigger_email_validation(obj) {
 }
 
 function verify_email_validation(obj) {
-  console.log('verify_email_validation called')
+  console.log("verify_email_validation called");
   if (obj) obj.disabled = true;
   let tkn = document.getElementById("token");
   if (!tkn) return;
@@ -166,6 +181,117 @@ function verify_email_validation(obj) {
     tkn.value += x.value;
   }
 
-  console.log('vev calling now')
+  console.log("vev calling now");
   trigger_email_validation();
+}
+
+// Background transmission routines
+
+const myStackItem = "eformsStack";
+
+function oc(obj) {
+  saveData(obj);
+}
+
+function oi(obj) {
+  obj.classList.remove("oc");
+  obj.classList.add("oi");
+  // Checkbox handler
+  obj.setAttribute("data-chg", "1");
+  // autosave handler
+  if (obj.timer) {
+    clearTimeout(obj.timer);
+  }
+  obj.timer = setTimeout(saveData, 3000, obj);
+}
+
+function saveData(obj) {
+  if (obj.getAttribute("data-static") == "") obj.setAttribute("data-chg", "");
+  console.log("saveData: " + obj.name);
+  if (obj.timer) {
+    clearTimeout(obj.timer);
+  }
+
+  let ent = document.getElementById("EntrantNumber").value;
+  let rid = document.getElementById("RiderID").value;
+  let pil = document.getElementById("PillionID").value;
+  let val = obj.value;
+  switch (obj.name) {
+    case "RiderPostcode":
+    case "PillionPostcode":
+    case "BikeReg":
+    case "RiderCountry":
+    case "PillionCountry":
+      val = val.toUpperCase();
+      break;
+  }
+
+  let url = encodeURI("/z?e=" + ent + "&r=" + rid + "&p=" + pil + "&f=" + obj.name + "&v=" + val);
+  stackTransaction(url, obj.id);
+  sendTransactions()
+  
+}
+
+function sendTransactions() {
+  let stackx = sessionStorage.getItem(myStackItem);
+  if (stackx == null) return;
+
+  let stack = JSON.parse(stackx);
+
+  //console.log(stack);
+
+  let errlog = document.getElementById("errlog");
+
+  while (stack.length > 0) {
+    let itm = stack[0];
+    stack.splice(0, 1);
+    sessionStorage.setItem(myStackItem, JSON.stringify(stack));
+    console.log("Sending: " + itm.url);
+
+    fetch(itm.url)
+      .then((response) => {
+        if (!response.ok) {
+          // Handle HTTP errors
+          stackTransaction(itm.url, itm.objid);
+          //if (errlog){errlog.innerHTML=`HTTP error! Status: ${response.status}`}
+
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((data) => {
+        if (data.err) {
+          // Handle JSON error field
+          console.error(`Error: ${data.msg}`);
+        } else {
+          // Process the data if no error
+          //if (errlog){errlog.innerHTML="Hello sailor: "+JSON.stringify(data)}
+          console.log("Data:", data);
+          document.getElementById(itm.objid).classList.replace("oi", "oc");
+        }
+      })
+      .catch((error) => {
+        // Handle network or other errors
+        //if (errlog) {errlog.innerHTML="ERROR CAUGHT"}
+        stackTransaction(itm.url, itm.objid);
+        console.error("Fetch error:", error);
+        return;
+      });
+  }
+}
+
+function stackTransaction(url, objid) {
+  console.log(url);
+  let newTrans = {};
+  newTrans.url = url;
+  newTrans.objid = objid;
+  newTrans.sent = false;
+
+  const stackx = sessionStorage.getItem(myStackItem);
+  let stack = [];
+  if (stackx != null) {
+    stack = JSON.parse(stackx);
+  }
+  stack.push(newTrans);
+  sessionStorage.setItem(myStackItem, JSON.stringify(stack));
 }
